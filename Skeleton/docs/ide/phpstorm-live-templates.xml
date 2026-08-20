@@ -1,0 +1,25 @@
+<templateSet group="Flexagon">
+  <!--
+    PhpStorm live templates for the doc block form of Flexagon's annotations.
+    The attribute form (#[Encrypt] and friends) needs none of this: the IDE
+    completes it from the class like any other symbol.
+
+    Settings → Editor → Live Templates → gear icon → Import Settings, or copy
+    this file into the IDE's templates directory.
+  -->
+  <template name="flx-encrypt" value="/** @encrypt */" description="Flexagon: encrypt this property" toReformat="false" toShortenFQNames="true">
+    <context><option name="PHP" value="true"/></context>
+  </template>
+  <template name="flx-timestamp" value="/** @db_auto_timestamp $ON$ */" description="Flexagon: fill with the current Unix timestamp" toReformat="false" toShortenFQNames="true">
+    <variable name="ON" expression="enum(&quot;insert&quot;, &quot;update&quot;, &quot;insert|update&quot;)" defaultValue="&quot;insert&quot;" alwaysStopAt="true"/>
+    <context><option name="PHP" value="true"/></context>
+  </template>
+  <template name="flx-exclude" value="/** @exclude_from_get_array */" description="Flexagon: keep this getter out of getArray()" toReformat="false" toShortenFQNames="true">
+    <context><option name="PHP" value="true"/></context>
+  </template>
+  <template name="flx-dao" value="class $NAME$DAO extends BaseMySqlDAO {&#10;    protected string $tableName = '$TABLE$';&#10;&#10;    public function insert($NAME$Model $model): int|false { return $this-&gt;_insert($model); }&#10;    public function update($NAME$Model $model): bool     { return $this-&gt;_update($model); }&#10;    public function findById(int $id): ?$NAME$Model      { return $this-&gt;_select(['id' =&gt; $id], new $NAME$Model()); }&#10;}" description="Flexagon: DAO skeleton" toReformat="true" toShortenFQNames="true">
+    <variable name="NAME" expression="" defaultValue="&quot;User&quot;" alwaysStopAt="true"/>
+    <variable name="TABLE" expression="" defaultValue="&quot;users&quot;" alwaysStopAt="true"/>
+    <context><option name="PHP" value="true"/></context>
+  </template>
+</templateSet>

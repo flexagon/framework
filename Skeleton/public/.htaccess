@@ -1,0 +1,10 @@
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteBase /
+
+RewriteCond %{REQUEST_URI} ^/index.php [OR]
+RewriteCond %{REQUEST_FILENAME}\.php -f [OR]
+RewriteCond %{REQUEST_URI} .*\.(php)
+RewriteCond %{REQUEST_URI} !^/__flexagon.php$
+RewriteRule . /__flexagon.php [L]
+</IfModule>

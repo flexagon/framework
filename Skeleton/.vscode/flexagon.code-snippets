@@ -1,0 +1,50 @@
+{
+    "//": [
+        "Flexagon annotations for the doc block form.",
+        "The attribute form (#[Encrypt] and friends) needs none of this: the",
+        "editor completes it from the class like any other symbol."
+    ],
+    "Flexagon: @encrypt": {
+        "scope": "php",
+        "prefix": ["@encrypt", "flx-encrypt"],
+        "body": ["/** @encrypt */"],
+        "description": "Encrypt this property on the way to the database"
+    },
+    "Flexagon: @db_auto_timestamp": {
+        "scope": "php",
+        "prefix": ["@db_auto_timestamp", "flx-timestamp"],
+        "body": ["/** @db_auto_timestamp ${1|insert,update,insert|update|} */"],
+        "description": "Fill this property with the current Unix timestamp"
+    },
+    "Flexagon: @exclude_from_get_array": {
+        "scope": "php",
+        "prefix": ["@exclude_from_get_array", "flx-exclude"],
+        "body": ["/** @exclude_from_get_array */"],
+        "description": "Keep this getter out of getArray() and getJson()"
+    },
+    "Flexagon: model property": {
+        "scope": "php",
+        "prefix": "flx-property",
+        "body": [
+            "private ${1:?string} \\$${2:name} = ${3:null};",
+            "",
+            "public function get${2/(.*)/${1:/capitalize}/}(): ${1:?string} { return \\$this->${2:name}; }",
+            "public function set${2/(.*)/${1:/capitalize}/}(${1:?string} \\$value): void { \\$this->${2:name} = \\$value; }"
+        ],
+        "description": "Property with its getter and setter"
+    },
+    "Flexagon: DAO": {
+        "scope": "php",
+        "prefix": "flx-dao",
+        "body": [
+            "class ${1:Name}DAO extends BaseMySqlDAO {",
+            "    protected string \\$tableName = '${2:table}';",
+            "",
+            "    public function insert(${1:Name}Model \\$model): int|false { return \\$this->_insert(\\$model); }",
+            "    public function update(${1:Name}Model \\$model): bool     { return \\$this->_update(\\$model); }",
+            "    public function findById(int \\$id): ?${1:Name}Model      { return \\$this->_select(['id' => \\$id], new ${1:Name}Model()); }",
+            "}"
+        ],
+        "description": "DAO skeleton"
+    }
+}

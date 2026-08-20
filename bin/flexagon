@@ -1,0 +1,339 @@
+#!/usr/bin/env php
+<?php
+/**
+ * flexagon
+ *
+ * The two things a project needs from the command line: the directory layout
+ * that `composer require flexagon/framework` cannot bring with it, and a way to
+ * find out whether the layout and the runtime actually agree.
+ *
+ *   flexagon init [--path=DIR] [--force]
+ *   flexagon check [--path=DIR]
+ *
+ * `composer create-project flexagon/skeleton` already delivers the layout, so
+ * init is for the other route: adding Flexagon to a project that exists.
+ *
+ * Flexagon : PHP Development Framework
+ *
+ * @copyright     Copyright (c) 2010-2026 Younghwan Yong
+ * @link          https://flexagon.org
+ * @license       MIT License (https://opensource.org/licenses/MIT)
+ */
+
+/**
+ * Every file a working project needs and the framework cannot supply at
+ * runtime. Templates are copied verbatim from the skeleton when the package is
+ * built, so this list is also what the build checks it shipped.
+ */
+function flexagon_manifest(): array
+{
+    return [
+        'flexagon.php',
+        'application/_Global.php',
+        'application/_Const.php',
+        'application/_Config.php',
+        'application/_Config/alpha/_Config.php',
+        'application/_Config/beta/_Config.php',
+        'application/_Config/production/_Config.php',
+        'public/.htaccess',
+        'public/__flexagon.php',
+        'public/_entry.php',
+        'public/_prepare.php',
+        'public/_router.php',
+        'public/index.php',
+        'public/_Template/head.php',
+        'public/_Template/tail.php',
+        'public/_Template/error404.php',
+        'script/__flexagon.php',
+        'script/flexagon.php',
+
+        // Editor help for the doc block spelling of the annotations.
+        '.vscode/flexagon.code-snippets',
+        'docs/ide/phpstorm-live-templates.xml',
+        'docs/ide/README.md',
+    ];
+}
+
+/**
+ * Where the templates live.
+ *
+ * Normally beside this script, inside the installed package. A checkout of the
+ * Flexagon repository has no Skeleton/ directory -- the templates are still the
+ * skeleton itself at that point -- so fall back to it.
+ */
+function flexagon_templateRoot(): ?string
+{
+    $frameworkRoot = dirname(__DIR__);
+
+    $candidates = [
+        $frameworkRoot . '/Skeleton',
+        dirname($frameworkRoot, 2),
+    ];
+
+    foreach ( $candidates as $candidate ) {
+        if ( is_file($candidate . '/public/__flexagon.php') ) { return $candidate; }
+    }
+    return null;
+}
+
+function flexagon_projectRoot(array $options): string
+{
+    $path = $options['path'] ?? getcwd();
+    $real = realpath($path);
+    return $real === false ? rtrim($path, '/') : $real;
+}
+
+function flexagon_parseOptions(array $argv): array
+{
+    $options = [];
+    foreach ( $argv as $argument ) {
+        if ( $argument === '--force' ) { $options['force'] = true; continue; }
+        if ( str_starts_with($argument, '--path=') ) { $options['path'] = substr($argument, 7); }
+    }
+    return $options;
+}
+
+function flexagon_line(string $status, string $message, string $detail = ''): void
+{
+    printf("  %-8s %s%s\n", $status, $message, $detail === '' ? '' : "  $detail");
+}
+
+/* ------------------------------------------------------------------- init -- */
+
+function flexagon_init(array $options): int
+{
+    $templateRoot = flexagon_templateRoot();
+    if ( $templateRoot === null ) {
+        /*
+         * The phar carries the framework, not the templates: anyone running
+         * from one already has a project around it. check still works there.
+         */
+        fwrite(STDERR, "flexagon: no project templates in this installation.\n");
+        fwrite(STDERR, "          They ship with the Composer package:\n");
+        fwrite(STDERR, "            composer require flexagon/framework\n");
+        fwrite(STDERR, "          or start from the skeleton instead:\n");
+        fwrite(STDERR, "            composer create-project flexagon/skeleton myapp\n");
+        return 1;
+    }
+
+    $projectRoot = flexagon_projectRoot($options);
+    $force = !empty($options['force']);
+
+    printf("Flexagon init\n  into      %s\n  templates %s\n\n", $projectRoot, $templateRoot);
+
+    $created = 0;
+    $skipped = 0;
+    $failed  = 0;
+
+    foreach ( flexagon_manifest() as $relativePath ) {
+        $source = $templateRoot . '/' . $relativePath;
+        $target = $projectRoot . '/' . $relativePath;
+
+        if ( !is_file($source) ) {
+            flexagon_line('missing', $relativePath, 'template not in package');
+            $failed++;
+            continue;
+        }
+
+        if ( is_file($target) && !$force ) {
+            flexagon_line('keep', $relativePath, 'already there');
+            $skipped++;
+            continue;
+        }
+
+        $directory = dirname($target);
+        if ( !is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory) ) {
+            flexagon_line('failed', $relativePath, 'cannot create ' . $directory);
+            $failed++;
+            continue;
+        }
+
+        if ( copy($source, $target) ) {
+            flexagon_line($force && $skipped === 0 ? 'write' : 'create', $relativePath);
+            $created++;
+        } else {
+            flexagon_line('failed', $relativePath, 'cannot write');
+            $failed++;
+        }
+    }
+
+    printf("\n  %d created, %d kept, %d failed\n", $created, $skipped, $failed);
+
+    if ( $failed === 0 ) {
+        echo "\n  next\n";
+        echo "    1. point the web server's document root at public/\n";
+        echo "    2. fill in application/_Config.php with a data source\n";
+        echo "    3. run 'flexagon check'\n";
+    }
+
+    return $failed === 0 ? 0 : 1;
+}
+
+/* ------------------------------------------------------------------ check -- */
+
+function flexagon_check(array $options): int
+{
+    $projectRoot = flexagon_projectRoot($options);
+    printf("Flexagon check\n  in %s\n\n", $projectRoot);
+
+    $problems = 0;
+    $warnings = 0;
+
+    // -- runtime ----------------------------------------------------------
+    if ( PHP_VERSION_ID >= 80300 ) {
+        flexagon_line('ok', 'php ' . PHP_VERSION);
+    } else {
+        flexagon_line('FAIL', 'php ' . PHP_VERSION, 'Flexagon needs 8.3 or newer');
+        $problems++;
+    }
+
+    foreach ( ['json', 'openssl', 'pdo'] as $extension ) {
+        if ( extension_loaded($extension) ) {
+            flexagon_line('ok', 'ext-' . $extension);
+        } else {
+            flexagon_line('FAIL', 'ext-' . $extension, 'not loaded');
+            $problems++;
+        }
+    }
+
+    /*
+     * Annotations are read back out of the doc comments at runtime, so an
+     * opcache that drops them takes @encrypt and @db_auto_timestamp with it --
+     * quietly, with no error anywhere.
+     */
+    if ( !extension_loaded('Zend OPcache') || !ini_get('opcache.enable') ) {
+        flexagon_line('ok', 'opcache.save_comments', 'opcache off for this SAPI');
+    } elseif ( ini_get('opcache.save_comments') ) {
+        flexagon_line('ok', 'opcache.save_comments');
+    } else {
+        /*
+         * Attributes are compiled into the class and do not care, so this only
+         * costs anything where the doc block spelling is still in use.
+         */
+        flexagon_line('warn', 'opcache.save_comments', 'off -- doc block annotations are ignored, attributes still work');
+        $warnings++;
+    }
+
+    // -- layout -----------------------------------------------------------
+    $required = ['flexagon.php', 'application/_Global.php', 'public/__flexagon.php', 'public/_router.php'];
+    $missing = [];
+    foreach ( $required as $relativePath ) {
+        if ( !is_file($projectRoot . '/' . $relativePath) ) { $missing[] = $relativePath; }
+    }
+    if ( empty($missing) ) {
+        flexagon_line('ok', 'project layout');
+    } else {
+        flexagon_line('FAIL', 'project layout', 'missing ' . implode(', ', $missing) . " -- run 'flexagon init'");
+        $problems++;
+    }
+
+    /*
+     * The config carries database credentials. It sits one level above the
+     * document root on purpose; a copy inside public/ is served as a file the
+     * moment PHP stops handling it.
+     */
+    foreach ( ['public/_Config.php', 'public/application'] as $mustNotExist ) {
+        if ( file_exists($projectRoot . '/' . $mustNotExist) ) {
+            flexagon_line('FAIL', 'config placement', $mustNotExist . ' is reachable from the web');
+            $problems++;
+        }
+    }
+
+    // -- configuration ----------------------------------------------------
+    if ( !empty($missing) ) {
+        printf("\n  %d problem(s), %d warning(s)\n", $problems, $warnings);
+        return $problems === 0 ? 0 : 1;
+    }
+
+    /*
+     * Booting tells us what the application actually configured, which no
+     * amount of file reading would. In CLI the bootstrap stops before the
+     * router, so nothing is served by loading it.
+     */
+    try {
+        require_once $projectRoot . '/flexagon.php';
+    } catch ( Throwable $e ) {
+        flexagon_line('FAIL', 'bootstrap', $e->getMessage());
+        printf("\n  %d problem(s), %d warning(s)\n", $problems + 1, $warnings);
+        return 1;
+    }
+    flexagon_line('ok', 'bootstrap');
+
+    if ( empty(_Global::$DATA_SOURCES) ) {
+        flexagon_line('warn', 'data sources', 'none configured -- DAOs cannot connect');
+        $warnings++;
+    } else {
+        /*
+         * The template ships placeholders so that the file parses. Reporting
+         * them as configured would be worse than saying nothing.
+         */
+        $untouched = [];
+        foreach ( _Global::$DATA_SOURCES as $sourceId => $dataSource ) {
+            if ( $dataSource->getUsername() === 'username' || $dataSource->getDbName() === 'dbname' ) {
+                $untouched[] = $sourceId;
+            }
+        }
+
+        if ( empty($untouched) ) {
+            flexagon_line('ok', 'data sources', implode(', ', array_keys(_Global::$DATA_SOURCES)));
+        } else {
+            flexagon_line('warn', 'data sources', implode(', ', $untouched) . ' still hold the template placeholders');
+            $warnings++;
+        }
+    }
+
+    if ( _Global::$SESSION_AUTO_START ) {
+        if ( strlen(_Global::$SESSION_ENCRYPTION_STRING) >= \FLEXAGON_CONST::CIPHER_PASSPHRASE_MIN_LENGTH ) {
+            flexagon_line('ok', 'session key');
+        } else {
+            flexagon_line('FAIL', 'session key', 'sessions are on but $SESSION_ENCRYPTION_STRING is too short');
+            $problems++;
+        }
+    } else {
+        flexagon_line('ok', 'session', 'auto start off');
+    }
+
+    /*
+     * ini_get() answers with the string "Off", which is true in PHP. Reading it
+     * as a boolean would report every correctly configured project as unsafe.
+     */
+    $displayErrors = filter_var((string)ini_get('display_errors'), FILTER_VALIDATE_BOOL);
+    if ( _Global::$RUNNING_MODE === \FLEXAGON_CONST::RUNNING_MODE_PRODUCTION && $displayErrors ) {
+        flexagon_line('warn', 'display_errors', 'on in production mode -- errors reach the browser');
+        $warnings++;
+    } else {
+        flexagon_line('ok', 'display_errors', $displayErrors ? 'on (not production mode)' : 'off');
+    }
+
+    printf("\n  %d problem(s), %d warning(s)\n", $problems, $warnings);
+    return $problems === 0 ? 0 : 1;
+}
+
+/* ------------------------------------------------------------------ entry -- */
+
+$command = $argv[1] ?? '';
+$options = flexagon_parseOptions(array_slice($argv, 2));
+
+switch ( $command ) {
+    case 'init':
+        exit(flexagon_init($options));
+
+    case 'check':
+        exit(flexagon_check($options));
+
+    /*
+     * Not for people: build-dist.sh asks for the list so that it copies exactly
+     * the files init will look for, and fails the build if one is missing.
+     */
+    case '--manifest':
+        echo implode("\n", flexagon_manifest()), "\n";
+        exit(0);
+
+    default:
+        echo "Flexagon " . (class_exists('\FLEXAGON_CONST') ? \FLEXAGON_CONST::FLEXAGON_VERSION : '') . "\n\n";
+        echo "  flexagon init  [--path=DIR] [--force]   create the project layout\n";
+        echo "  flexagon check [--path=DIR]             verify layout and runtime\n\n";
+        echo "  A new project is usually easier the other way:\n";
+        echo "    composer create-project flexagon/skeleton myapp\n";
+        exit($command === '' || $command === 'help' ? 0 : 1);
+}

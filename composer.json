@@ -1,0 +1,66 @@
+{
+    "name": "flexagon/framework",
+    "description": "Flexagon : a lightweight PHP web framework with no runtime dependencies",
+    "type": "library",
+    "bin": [
+        "bin/flexagon"
+    ],
+    "keywords": [
+        "framework",
+        "microframework",
+        "lightweight",
+        "dao",
+        "phar"
+    ],
+    "homepage": "https://flexagon.org",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Younghwan Yong",
+            "email": "young@phpk.org",
+            "homepage": "https://flexagon.org",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/flexagon/framework/issues",
+        "source": "https://github.com/flexagon/framework"
+    },
+    "require": {
+        "php": ">=8.3",
+        "ext-json": "*",
+        "ext-openssl": "*",
+        "ext-pdo": "*"
+    },
+    "suggest": {
+        "ext-pdo_mysql": "Required by _Flexagon\\DB\\Mysql (MySQL / MariaDB data sources)",
+        "ext-pdo_sqlsrv": "Required by _Flexagon\\DB\\Mssql; preferred over pdo_dblib for full Unicode parameter binding",
+        "ext-pdo_dblib": "Alternative driver for _Flexagon\\DB\\Mssql on platforms without pdo_sqlsrv"
+    },
+    "autoload": {
+        "psr-4": {
+            "_Flexagon\\Base\\": "Base/",
+            "_Flexagon\\Attributes\\": "Attributes/",
+            "_Flexagon\\DB\\": "DB/",
+            "_Flexagon\\Libs\\": "Libs/",
+            "_Flexagon\\Models\\": "Models/",
+            "_Flexagon\\Supporters\\": "Supporters/"
+        },
+        "classmap": [
+            "FlexagonConst.php",
+            "FlexagonEnv.php",
+            "Libs/TemplateLoader.php"
+        ],
+        "files": [
+            "Libs/_Util.php"
+        ]
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "3.5.x-dev"
+        }
+    }
+}
