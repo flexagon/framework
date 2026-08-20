@@ -760,8 +760,6 @@ if (str_starts_with(_Global::$URL_PARAM->filePath, 'admin/')) {
 
 ## Security
 
-Flexagon clearly separates protections provided by the framework from responsibilities left to the application. See [SECURITY.md](SECURITY.md) for the full list and vulnerability-reporting process.
-
 ### What the Framework Provides
 
 | Item | Description |
