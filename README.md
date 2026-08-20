@@ -90,13 +90,13 @@ cd myapp
 
 ```
 myapp/
-├── application/          # 도메인 코드
+├── application/          # Domain code
 ├── public/               # ← document root
-├── script/               # CLI 배치
+├── script/               # CLI jobs
 ├── flexagon.php
 ├── composer.json
 └── vendor/
-    └── flexagon/framework/   # 프레임워크 본체
+    └── flexagon/framework/   # Framework core
 ```
 
 You can update the framework independently.
@@ -109,7 +109,7 @@ composer update flexagon/framework
 
 ```bash
 composer require flexagon/framework
-composer exec flexagon init      # 또는 php vendor/bin/flexagon init
+composer exec flexagon init      # or php vendor/bin/flexagon init
 ```
 
 `init` creates the 18 files that make up the project structure, including `public/`, `application/`, `script/`, and `flexagon.php`. **Existing files are left untouched**, so you can also use it after an upgrade to add only newly introduced structure files. Use `--force` to overwrite existing files.
@@ -118,7 +118,7 @@ composer exec flexagon init      # 또는 php vendor/bin/flexagon init
 create   flexagon.php
 create   application/_Global.php
 ...
-keep     public/index.php        ← 이미 있으면 그대로
+keep     public/index.php        ← keep existing file
 ```
 
 > Installing only `flexagon/framework` gives you immediate access to utility classes such as `StringUtil`, `ValidUtil`, and `CryptoUtil`, as well as `BaseModel`. However, **the DAO layer requires the application to define `_Global`.** Without it, `BaseGlobal` defaults are used, so no fatal error occurs, but the empty data-source configuration prevents database connections. For real applications, start with the skeleton package.
@@ -176,7 +176,7 @@ _Global::$DATA_SOURCES['default'] = new DataSourceModel(
 ```php
 <?php
 // public/hello.php
-_Global::$SITE_TITLE = '안녕하세요';
+_Global::$SITE_TITLE = 'Hello';
 
 TemplateLoader::show('head');
 echo '<h1>Hello, Flexagon</h1>';
@@ -190,8 +190,8 @@ Open `http://127.0.0.1:9001/hello` to render the page.
 Verify that the project layout and runtime configuration are consistent.
 
 ```bash
-php script/flexagon.php check     # 설치 형태와 무관
-php vendor/bin/flexagon check     # Composer 설치라면 이쪽도 가능
+php script/flexagon.php check     # works with any installation type
+php vendor/bin/flexagon check     # also available with Composer installations
 ```
 
 ```
@@ -199,7 +199,7 @@ ok       php 8.3.33
 ok       opcache.save_comments
 ok       project layout
 ok       bootstrap
-warn     data sources  default 이 템플릿 플레이스홀더 그대로
+warn     data sources  default still contains template placeholders
 ok       display_errors  off
 ```
 
@@ -213,25 +213,25 @@ See [Framework CLI](#프레임워크-cli) for the complete list of checks.
 
 ```
 myapp/
-├── application/                 # 도메인 코드
-│   ├── _Global.php              #   애플리케이션 전역 (BaseGlobal 상속)
-│   ├── _Const.php               #   애플리케이션 상수
-│   ├── _Config.php              #   데이터소스 등 기본 설정
-│   ├── _Config/                 #   스테이지별 설정 (alpha · beta · production)
-│   └── <Namespace>/             #   Model 과 DAO
+├── application/                 # Domain code
+│   ├── _Global.php              #   Application globals (extends BaseGlobal)
+│   ├── _Const.php               #   Application constants
+│   ├── _Config.php              #   Base configuration, including data sources
+│   ├── _Config/                 #   Stage-specific configuration (alpha · beta · production)
+│   └── <Namespace>/             #   Models and DAOs
 ├── public/                      # ← document root
 │   ├── .htaccess
-│   ├── __flexagon.php           #   모든 요청이 거쳐 가는 프론트 컨트롤러
-│   ├── _entry.php               #   요청 시작 훅
-│   ├── _prepare.php             #   세션 이후 훅
-│   ├── _router.php              #   디스패치 지점
-│   ├── _Template/               #   공용 템플릿 (head · tail · error404)
-│   └── **/*.php                 #   URL 과 1:1 대응하는 페이지
-├── script/                      # CLI 배치
+│   ├── __flexagon.php           #   Front controller for all requests
+│   ├── _entry.php               #   Request-start hook
+│   ├── _prepare.php             #   Post-session hook
+│   ├── _router.php              #   Dispatch point
+│   ├── _Template/               #   Shared templates (head · tail · error404)
+│   └── **/*.php                 #   Pages mapped 1:1 to URLs
+├── script/                      # CLI jobs
 ├── composer.json
-├── flexagon.php                 # 부트스트랩 로더
+├── flexagon.php                 # Bootstrap loader
 └── vendor/
-    └── flexagon/framework/      # 프레임워크 본체
+    └── flexagon/framework/      # Framework core
 ```
 
 **Under `application/`, namespaces map directly to directory paths.** `ExampleUser\UserDAO` → `application/ExampleUser/UserDAO.php`.
@@ -245,22 +245,22 @@ The `_Flexagon\` namespace resolves to the framework itself and normally does no
 ## Request Lifecycle
 
 ```
-브라우저
+Browser
   │
-  ├─ .htaccess          모든 .php 요청을 __flexagon.php 로 rewrite
+  ├─ .htaccess          rewrites all .php requests to __flexagon.php
   │
   ├─ __flexagon.php ──► flexagon.php ──► Bootstrap.php
   │                                        │
-  │                                        ├─ 상수 정의 (PROJECT_ROOT, PUBLIC_ROOT, _FLEXAGON_ROOT ...)
-  │                                        ├─ 오토로더 등록
-  │                                        ├─ _Const.php / _Global.php / _Config.php 로드
-  │                                        └─ URL 파싱 → _Global::$URL_PARAM
+  │                                        ├─ defines constants (PROJECT_ROOT, PUBLIC_ROOT, _FLEXAGON_ROOT ...)
+  │                                        ├─ registers the autoloader
+  │                                        ├─ loads _Const.php / _Global.php / _Config.php
+  │                                        └─ parses the URL → _Global::$URL_PARAM
   │
-  ├─ public/_entry.php      ① 요청 시작 훅 (사이트 제목, 공통 헤더 등)
-  ├─ [세션 자동 시작]        ② $SESSION_AUTO_START 가 true 인 경우
-  ├─ public/_prepare.php    ③ 세션 이후 훅 (권한 검사 등)
-  └─ public/_router.php     ④ 디스패치 — 기본 구현은 TemplateLoader::content()
-                                 → public/<URL 경로>.php 실행
+  ├─ public/_entry.php      ① request-start hook (site title, shared headers, etc.)
+  ├─ [automatic session start] ② when $SESSION_AUTO_START is true
+  ├─ public/_prepare.php    ③ post-session hook (authorization checks, etc.)
+  └─ public/_router.php     ④ dispatch — default implementation uses TemplateLoader::content()
+                                 → executes public/<URL path>.php
 ```
 
 The three hooks run at distinct stages of the request lifecycle.
@@ -325,7 +325,7 @@ All global configuration values are static properties of the `_Global` class, wh
 use _Flexagon\Base\BaseGlobal;
 
 class _Global extends BaseGlobal {
-    // 애플리케이션 고유 전역을 여기에 추가
+    // Add application-specific globals here
     public static ?\Session\SessionUserModel $SESSION_USER_MODEL = null;
 }
 ```
@@ -494,28 +494,6 @@ The CRUD methods are `protected` by design. Each DAO explicitly chooses which op
 
 When using SQL Server, `BaseMsSqlDAO` provides **the same method surface**. Both DAO implementations extend `BaseSqlDAO`, where CRUD operations, schema caching, and transaction handling are shared. Subclasses contain only dialect-specific behavior: identifier quoting (`` `name` `` / `[name]`), schema inspection (`DESCRIBE` / `INFORMATION_SCHEMA`), and pagination (`LIMIT` / `OFFSET·FETCH`).
 
-> **SQL Server + Unicode** — Flexagon prefers `pdo_sqlsrv` and falls back to `pdo_dblib` when unavailable. Because `pdo_dblib` binds string parameters using the server's single-byte code page, characters outside that code page may be written as `?` even to an `NVARCHAR` column. Reads work normally, and no error is raised, so the issue may remain unnoticed until the value is read later.
->
-> ```
-> 준비문 사용   : '?? ?? café'      ← 서울·東京 소실, é 는 CP1252 라 생존
-> 준비문 미사용 : '서울 東京 café'
-> ```
->
-> With this combination, the framework logs a warning **once per data source**.
->
-> ```
-> [FLEXAGON] data source "default" uses pdo_dblib with prepared statements: ...
-> ```
->
-> If you store Korean, Japanese, Chinese, or other Unicode text, install `pdo_sqlsrv`. If that is not possible, disable prepared statements for the affected data source; Flexagon will build `N'...'` literals to preserve Unicode.
->
-> ```php
-> _Global::$DATA_SOURCES['default']->setUsePrepareStatement(false);
-> _Global::$DB_WARN_DBLIB_UNICODE = false;   // 제약을 알고 쓰는 경우 경고만 끄기
-> ```
->
-> Disabling prepared statements inlines values into the SQL string. Flexagon doubles quotes and removes control characters, but this has a broader attack surface than true prepared statements, where the server separates values from syntax. Prefer `pdo_sqlsrv` whenever possible.
-
 When you need direct SQL, use `$this->db` (a `Mysql` instance).
 
 ```php
@@ -547,7 +525,7 @@ If the same placeholder appears multiple times in a query, `SqlUtil::expandQuery
 
 ```php
 $this->_selectList(new UserModel(), 1, 20,
-    '`name` LIKE :KEYWORD OR `address` LIKE :KEYWORD',   // 두 번 등장해도 됨
+    '`name` LIKE :KEYWORD OR `address` LIKE :KEYWORD',   // may appear more than once
     ['KEYWORD' => "%{$keyword}%"]
 );
 ```
@@ -555,8 +533,8 @@ $this->_selectList(new UserModel(), 1, 20,
 ### Debugging
 
 ```php
-echo $userDAO->debugQuery();   // 파라미터가 치환된 실제 SQL
-echo $userDAO->getError();     // 마지막 오류 메시지
+echo $userDAO->debugQuery();   // actual SQL with parameters substituted
+echo $userDAO->getError();     // last error message
 $userDAO->debugDumpParams();   // PDOStatement::debugDumpParams()
 ```
 
@@ -701,9 +679,9 @@ _Global::$SESSION_ENCRYPTION_STRING = 'change-this-to-a-long-random-string';
 _Global::$SESSION_DOMAIN          = '.example.com';
 _Global::$SESSION_TIMEOUT_SECONDS = 86400;
 
-// 쿠키 보안 속성 — 기본값이 이미 안전하므로 보통 건드릴 필요가 없습니다.
-_Global::$SESSION_COOKIE_SECURE   = null;    // null = HTTPS 요청이면 자동으로 켬
-_Global::$SESSION_COOKIE_HTTPONLY = true;    // JS 에서 세션 쿠키를 읽지 못하게
+// Cookie security attributes — the defaults are already secure and usually do not need to be changed.
+_Global::$SESSION_COOKIE_SECURE   = null;    // null = automatically enabled for HTTPS requests
+_Global::$SESSION_COOKIE_HTTPONLY = true;    // prevent JavaScript from accessing the session cookie
 _Global::$SESSION_COOKIE_SAMESITE = 'Lax';
 ```
 
@@ -752,8 +730,8 @@ $sessionDAO->cleanSession();
 When `$SESSION_AUTO_START` is enabled, the session is restored during bootstrap and exposed in two locations.
 
 ```php
-_Global::$SESSION_MODEL;        // 항상 여기에 들어감
-_Global::$SESSION_USER_MODEL;   // 클래스명 기반 전역 (아래 참조)
+_Global::$SESSION_MODEL;        // always available here
+_Global::$SESSION_USER_MODEL;   // class-name-based global (see below)
 ```
 
 The second form is derived by converting the model class name to UPPER_SNAKE_CASE (`SessionUserModel` → `SESSION_USER_MODEL`). To access it with a type hint, declare the corresponding static property in `_Global` **in advance**.
@@ -800,14 +778,14 @@ Flexagon clearly separates protections provided by the framework from responsibi
 **These features are intentionally not provided by the framework.** Do not assume Flexagon handles them automatically.
 
 ```php
-// CSRF — 토큰 기능이 없습니다. 상태를 바꾸는 요청은 직접 검증하세요.
-// 출력 이스케이프 — 템플릿에 자동 이스케이프가 없습니다.
+// CSRF — no token mechanism is provided. Validate state-changing requests yourself.
+// Output escaping — templates do not provide automatic escaping.
 echo htmlspecialchars($user->getName(), ENT_QUOTES, 'UTF-8');
 
-// 대량 할당 — $_POST 를 그대로 넘기면 id·role 까지 덮입니다.
+// Mass assignment — passing $_POST directly may overwrite fields such as id and role.
 $user->setByArray(array_intersect_key($_POST, array_flip(['name', 'email'])));
 
-// 직렬화 — getArray()/getJson() 은 기본적으로 모든 게터를 포함합니다.
+// Serialization — getArray()/getJson() include all getters by default.
 /** @exclude_from_get_array */
 public function getPasswordHash(): string { ... }
 ```
@@ -823,10 +801,10 @@ The application is also responsible for validating redirect targets, preventing 
 ### TemplateLoader
 
 ```php
-TemplateLoader::show('head', ['title' => '상품 목록']);   // public/_Template/head.php
-TemplateLoader::content();                                // URL에 대응하는 페이지 실행
-TemplateLoader::entryDir('_layout');                      // 현재 URL 디렉터리의 _layout.php
-TemplateLoader::entryRoot('_footer');                     // public/_footer.php
+TemplateLoader::show('head', ['title' => 'Product List']);   // public/_Template/head.php
+TemplateLoader::content();                                   // execute the page mapped to the URL
+TemplateLoader::entryDir('_layout');                         // _layout.php in the current URL directory
+TemplateLoader::entryRoot('_footer');                        // public/_footer.php
 ```
 
 The supplied array is passed through `extract()` and exposed as local variables inside the template.
@@ -851,12 +829,12 @@ Collect CSS and JavaScript assets and render them together at the desired locati
 ```php
 use _Flexagon\Libs\AssetLoader;
 
-AssetLoader::setVersion('3.4.13');          // 모든 에셋 URL에 ?_=3.4.13
+AssetLoader::setVersion('3.4.13');          // append ?_=3.4.13 to all asset URLs
 AssetLoader::setAssetRootPath('/assets/');
 
-AssetLoader::setCss('main.css');                        // /assets/css/main.css (preload 포함)
+AssetLoader::setCss('main.css');                        // /assets/css/main.css (includes preload)
 AssetLoader::setJs('app.js', isModule: true);           // /assets/js/app.js
-AssetLoader::setJs('https://cdn.example.com/lib.js');   // 외부 URL은 그대로
+AssetLoader::setJs('https://cdn.example.com/lib.js');   // external URLs remain unchanged
 
 echo AssetLoader::getImageHtml('logo.png', 120, 40, 'Logo');
 echo AssetLoader::getAssetUrl('fonts/pretendard.woff2');
@@ -897,8 +875,8 @@ All utilities use static methods and have no external dependencies. Their namesp
 The three functions defined by `Libs/_Util.php` are available globally without a namespace.
 
 ```php
-_echo('안녕하세요, {name}님', ['name' => $user->getName()]);   // 치환 후 출력
-$msg = _t('{count}건 검색됨', ['count' => 42]);                // 치환 후 반환
+_echo('Hello, {name}', ['name' => $user->getName()]);   // substitute and output
+$msg = _t('{count} results found', ['count' => 42]);    // substitute and return
 ```
 
 When gettext (`__()` or `_()`) is available, translation is applied before placeholder substitution.
@@ -929,9 +907,9 @@ When generating DDL for an ENUM column, use `toQuotedCommaString()`. It quotes e
 UserRole::toQuotedCommaString();      // "'ADMIN','USER'"
 UserRole::toQuotedCommaString('"');   // '"ADMIN","USER"'
 
-// 값에 따옴표나 쉼표가 있어도 안전합니다
+// Safe even when values contain quotes or commas
 // case A = "it's";  case B = 'a,b';
-//   toCommaString()        → it's,a,b          (DDL 이 깨짐)
+//   toCommaString()        → it's,a,b          (breaks DDL)
 //   toQuotedCommaString()  → 'it''s','a,b'
 ```
 
@@ -951,7 +929,7 @@ Place batch jobs in the `script/` directory.
 require_once '__flexagon.php';
 
 $deleted = (new \ExampleUser\UserDAO())->deleteExpired();
-echo "삭제: {$deleted}건\n";
+echo "Deleted: {$deleted} rows\n";
 ```
 
 ```bash
@@ -1022,7 +1000,7 @@ $ php script/flexagon.php check
   ok       opcache.save_comments
   ok       project layout
   ok       bootstrap
-  warn     data sources  default 이 템플릿 플레이스홀더 그대로
+  warn     data sources  default still contains template placeholders
   ok       session  auto start off
   ok       display_errors  off
 
